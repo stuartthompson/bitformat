@@ -12,6 +12,7 @@ I created this crate to solve a specific problem. It is in a very early stage.
 
 * v0.0.1 - Initial crate version
 * v0.0.2 - Includes examples in README, adds changelog and roadmap
+* v0.0.3 - README formatting updates
 
 ## Roadmap
 
