@@ -94,20 +94,19 @@ impl<'a> WebSocketFrame<'a> {
         let mut result = self.format_header();
 
         result.push_str(&format!(
-            "
-        +-------+-+-+-+-+-------+-+-------------+-------------------------------+
-        | DWORD |{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}|
-        |   1   |F|R|R|R|       |M|             |                               |
-        |       |I|S|S|S|op code|A| Payload len |     Masking-key (part 1)      |
-        |       |N|V|V|V| (4 b) |S|  (7 bits)   |           (16 bits)           |
-        |       | |1|2|3|       |K|             |                               |
-        +-------+-+-+-+-+-------+-+-------------+-------------------------------+
-        | DWORD |{9}|{10}|{11}|{12}|
-        |   2   |                               | {13:>5}      MASKED  {14:>5}      |
-        |       |     Masking-key (part 2)      |{15}|{16}|
-        |       |           (16 bits)           | {17:>5} '{18}' UNMASKED {19:>5} '{20}'  |
-        |       |                               |     Payload Data (part 1)     |       
-        +-------+-------------------------------+-------------------------------+",
+            "       +-------+-+-+-+-+-------+-+-------------+-------------------------------+
+       | DWORD |{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}|
+       |   1   |F|R|R|R|       |M|             |                               |
+       |       |I|S|S|S|op code|A| Payload len |     Masking-key (part 1)      |
+       |       |N|V|V|V| (4 b) |S|  (7 bits)   |           (16 bits)           |
+       |       | |1|2|3|       |K|             |                               |
+       +-------+-+-+-+-+-------+-+-------------+-------------------------------+
+       | DWORD |{9}|{10}|{11}|{12}|
+       |   2   |                               | {13:>5}      MASKED  {14:>5}      |
+       |       |     Masking-key (part 2)      |{15}|{16}|
+       |       |           (16 bits)           | {17:>5} '{18}' UNMASKED {19:>5} '{20}'  |
+       |       |                               |     Payload Data (part 1)     |       
+       +-------+-------------------------------+-------------------------------+",
             bit_str(self.fin_bit),
             bit_str(self.rsv1),
             bit_str(self.rsv2),
@@ -151,6 +150,7 @@ impl<'a> WebSocketFrame<'a> {
                 (remaining_payload_dwords * 2) + 2,
             ));
         }
+
         result
     }
 
@@ -160,24 +160,41 @@ impl<'a> WebSocketFrame<'a> {
     ///
     /// * `self` The WebSocket frame being formatted.
     fn format_header(self: &WebSocketFrame<'a>) -> String {
-        format!(
-            "
-                   +---------------+---------------+---------------+---------------+
-      Frame Data   |    Byte  0    |    Byte  1    |    Byte  2    |    Byte  3    |
-      {0:^10}   +---------------+---------------+---------------+---------------+
-      {1:^10}   |0              |    1          |        2      |            3  |
-                   |0 1 2 3 4 5 6 7|8 9 0 1 2 3 4 5|6 7 8 9 0 1 2 3|4 5 6 7 8 9 0 1|",
-            if self.is_payload_masked {
-                "(Masked)"
-            } else {
-                "(Unmasked)"
-            },
-            if self.is_short_payload {
-                "(Short)"
-            } else {
-                "(Long) "
-            }
-        )
+        // Start the with top border
+        let mut result: String = format!("{0:15}{1}\n", " ","+---------------+---------------+---------------+---------------+");
+
+        // Append column headers
+        result.push_str(&format!("{0:2}{1}\n", " ", "Frame Data   |    Byte  0    |    Byte  1    |    Byte  2    |    Byte  3    |"));
+        result.push_str(
+            &format!(
+                "{0:2}{1}\n", 
+                " ",
+                format!(
+                    "{0:^10}   +---------------+---------------+---------------+---------------+",
+                    if self.is_payload_masked { "(Masked)" } else { "(Unmasked)" }
+                )
+            ));
+        result.push_str(
+            &format!(
+                "{0:2}{1}\n",
+                " ",
+                format!(
+                    "{0:^10}   |0              |    1          |        2      |            3  |",
+                    if self.is_short_payload { "(Short)" } else { "(Long)" }
+                )
+            ));
+        result.push_str(
+            &format!(
+                "{0:5}{1}\n",
+                " ",
+                format!(
+                    "{0:10}{1}", 
+                    " ", 
+                    "|0 1 2 3 4 5 6 7|8 9 0 1 2 3 4 5|6 7 8 9 0 1 2 3|4 5 6 7 8 9 0 1|",
+                )
+            ));
+
+        result
     }
 
     /// Formats a dword table row displaying part of a websocket frame payload.
@@ -386,8 +403,11 @@ mod tests {
         let bytes = base64::decode("gYNaDpE2O2zy").unwrap();
 
         let frame = WebSocketFrame::from_bytes(&bytes);
-        let expected = "\n                   +---------------+---------------+---------------+---------------+\n      Frame Data   |    Byte  0    |    Byte  1    |    Byte  2    |    Byte  3    |\n       (Masked)    +---------------+---------------+---------------+---------------+\n       (Short)     |0              |    1          |        2      |            3  |\n                   |0 1 2 3 4 5 6 7|8 9 0 1 2 3 4 5|6 7 8 9 0 1 2 3|4 5 6 7 8 9 0 1|\n        +-------+-+-+-+-+-------+-+-------------+-------------------------------+\n        | DWORD |1|0|0|0|0 0 0 1|1|0 0 0 0 0 1 1|0 1 0 1 1 0 1 0|0 0 0 0 1 1 1 0|\n        |   1   |F|R|R|R|       |M|             |                               |\n        |       |I|S|S|S|op code|A| Payload len |     Masking-key (part 1)      |\n        |       |N|V|V|V| (4 b) |S|  (7 bits)   |           (16 bits)           |\n        |       | |1|2|3|       |K|             |                               |\n        +-------+-+-+-+-+-------+-+-------------+-------------------------------+\n        | DWORD |1 0 0 1 0 0 0 1|0 0 1 1 0 1 1 0|0 0 1 1 1 0 1 1|0 1 1 0 1 1 0 0|\n        |   2   |                               |  (59)      MASKED  (108)      |\n        |       |     Masking-key (part 2)      |0 1 1 0 0 0 0 1|0 1 1 0 0 0 1 0|\n        |       |           (16 bits)           |  (97) \'a\' UNMASKED  (98) \'b\'  |\n        |       |                               |     Payload Data (part 1)     |       \n        +-------+-------------------------------+-------------------------------+\n       | DWORD |1 1 1 1 0 0 1 0|\n       |   3   | (242)     MSK |\n       |       |0 1 1 0 0 0 1 1|\n       |       |  (99) \'c\' UNM |\n       |       | Payload pt 2  |\n       +-------+---------------+\n";
+        let expected = "               +---------------+---------------+---------------+---------------+\n  Frame Data   |    Byte  0    |    Byte  1    |    Byte  2    |    Byte  3    |\n   (Masked)    +---------------+---------------+---------------+---------------+\n   (Short)     |0              |    1          |        2      |            3  |\n               |0 1 2 3 4 5 6 7|8 9 0 1 2 3 4 5|6 7 8 9 0 1 2 3|4 5 6 7 8 9 0 1|\n       +-------+-+-+-+-+-------+-+-------------+-------------------------------+\n       | DWORD |1|0|0|0|0 0 0 1|1|0 0 0 0 0 1 1|0 1 0 1 1 0 1 0|0 0 0 0 1 1 1 0|\n       |   1   |F|R|R|R|       |M|             |                               |\n       |       |I|S|S|S|op code|A| Payload len |     Masking-key (part 1)      |\n       |       |N|V|V|V| (4 b) |S|  (7 bits)   |           (16 bits)           |\n       |       | |1|2|3|       |K|             |                               |\n       +-------+-+-+-+-+-------+-+-------------+-------------------------------+\n       | DWORD |1 0 0 1 0 0 0 1|0 0 1 1 0 1 1 0|0 0 1 1 1 0 1 1|0 1 1 0 1 1 0 0|\n       |   2   |                               |  (59)      MASKED  (108)      |\n       |       |     Masking-key (part 2)      |0 1 1 0 0 0 0 1|0 1 1 0 0 0 1 0|\n       |       |           (16 bits)           |  (97) \'a\' UNMASKED  (98) \'b\'  |\n       |       |                               |     Payload Data (part 1)     |       \n       +-------+-------------------------------+-------------------------------+\n       | DWORD |1 1 1 1 0 0 1 0|\n       |   3   | (242)     MSK |\n       |       |0 1 1 0 0 0 1 1|\n       |       |  (99) \'c\' UNM |\n       |       | Payload pt 2  |\n       +-------+---------------+\n";
         
+        // println!("1-------10--------20--------30--------40--------50--------60--------70--------80");
+        // println!("{}", frame.format());
+
         assert_eq!(frame.format(), expected);
     }
 }

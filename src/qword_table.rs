@@ -1,20 +1,18 @@
 const BITS_IN_BYTE: u8 = 8;
 
 pub struct QwordTable<'a> {
-    data: &'a Vec<u8>
+    data: &'a Vec<u8>,
 }
 
 impl<'a> QwordTable<'a> {
     pub fn from_bytes(data: &Vec<u8>) -> QwordTable {
-        QwordTable {
-            data
-        }
+        QwordTable { data }
     }
 
     /// Formats a vector of bytes as a qword table.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `data` - The bytes to format.
     pub fn format(self: &QwordTable<'a>) -> String {
         let mut result = self.format_qword_table_header();
@@ -24,7 +22,11 @@ impl<'a> QwordTable<'a> {
             let from_byte_ix = i * BITS_IN_BYTE as usize;
             let to_byte_ix = from_byte_ix + BITS_IN_BYTE as usize;
             let qword_number: usize = i + 1;
-            result.push_str(&self.format_qword_row(qword_number, &self.data[from_byte_ix..to_byte_ix], BITS_IN_BYTE as usize));
+            result.push_str(&self.format_qword_row(
+                qword_number,
+                &self.data[from_byte_ix..to_byte_ix],
+                BITS_IN_BYTE as usize,
+            ));
         }
         // Append final bytes
         let remaining_bytes = self.data.len().rem_euclid(BITS_IN_BYTE as usize);
@@ -43,11 +45,7 @@ impl<'a> QwordTable<'a> {
     fn format_qword_table_header(self: &QwordTable<'a>) -> String {
         // Top border
         let mut result = String::from("       +");
-        result.push_str(
-            &(0..BITS_IN_BYTE)
-                .map(|_| "--------+")
-                .collect::<String>(),
-        );
+        result.push_str(&(0..BITS_IN_BYTE).map(|_| "--------+").collect::<String>());
         // Append table label
         result.push_str("\n Bytes |");
         // Append column labels
@@ -58,25 +56,29 @@ impl<'a> QwordTable<'a> {
         );
         // Append bottom border
         result.push_str("\n+------+");
-        result.push_str(
-            &(0..BITS_IN_BYTE)
-                .map(|_| "--------+")
-                .collect::<String>(),
-        );
+        result.push_str(&(0..BITS_IN_BYTE).map(|_| "--------+").collect::<String>());
         result.push_str("\n");
         result
     }
 
     /// Formats a row of bytes in a qword table.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `qword_number` - The sequence number of this qword.
     /// * `data` - The bytes within the qword to format.
     /// * `num_bytes` - The number of bytes to format.
-    fn format_qword_row(self: &QwordTable<'a>, qword_number: usize, data: &[u8], num_bytes: usize) -> String {
+    fn format_qword_row(
+        self: &QwordTable<'a>,
+        qword_number: usize,
+        data: &[u8],
+        num_bytes: usize,
+    ) -> String {
         if data.len() != num_bytes {
-            return format!("ERROR: Data must contain exactly {} bytes. QWORD: {}\n", num_bytes, qword_number);
+            return format!(
+                "ERROR: Data must contain exactly {} bytes. QWORD: {}\n",
+                num_bytes, qword_number
+            );
         }
 
         // Row header
@@ -97,11 +99,7 @@ impl<'a> QwordTable<'a> {
         );
         // Append bottom border
         result.push_str("\n+------+");
-        result.push_str(
-            &(0..num_bytes)
-                .map(|_| "--------+")
-                .collect::<String>(),
-        );
+        result.push_str(&(0..num_bytes).map(|_| "--------+").collect::<String>());
         result.push_str("\n");
         result
     }
@@ -109,13 +107,15 @@ impl<'a> QwordTable<'a> {
 
 #[cfg(test)]
 mod tests {
-    // #[test]
-    // fn test_qword_one_byte_basic() {
-    //     use super::*;
-    //     let result = qword_row_one_byte(2, &[129]);
-    //     assert_eq!(
-    //         "\n|QWORD |10000001|\n|  2   |   (129)|\n+------+--------+",
-    //         result
-    //     );
-    // }
+    use super::*;
+
+    #[test]
+    fn test_one_byte() {
+        let data = vec![129];
+        let table: QwordTable = QwordTable::from_bytes(&data);
+
+        let expected = "       +--------+--------+--------+--------+--------+--------+--------+--------+\n Bytes | Byte 0 | Byte 1 | Byte 2 | Byte 3 | Byte 4 | Byte 5 | Byte 6 | Byte 7 |\n+------+--------+--------+--------+--------+--------+--------+--------+--------+\n|QWORD |10000001|\n|  1   |   (129)|\n+------+--------+\n";
+
+        assert_eq!(expected, table.format());
+    }
 }
