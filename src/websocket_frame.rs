@@ -309,27 +309,82 @@ impl<'a> WebSocketFrame<'a> {
                 notes_color("K"),
             )
         );
-        result.push_str(&format!(
-       "+-------+-+-+-+-+-------+-+-------------+-------------------------------+
-       | DWORD |{0}|{1}|{2}|{3}|
-       |   2   |                               | {4:>5}      MASKED  {5:>5}      |
-       |       |     Masking-key (part 2)      |{6}|{7}|
-       |       |           (16 bits)           | {8:>5} '{9}' UNMASKED {10:>5} '{11}'  |
-       |       |                               |     Payload Data (part 1)     |       
-       +-------+-------------------------------+-------------------------------+",
-            byte_str(self.masking_key[2], 8),
-            byte_str(self.masking_key[3], 8),
-            byte_str(self.masked_payload[0], 8),
-            byte_str(self.masked_payload[1], 8),
-            format!("({})", self.masked_payload[0]),
-            format!("({})", self.masked_payload[1]),
-            byte_str(self.unmasked_payload[0], 8),
-            byte_str(self.unmasked_payload[1], 8),
-            format!("({})", self.unmasked_payload[0]),
-            self.payload[0],
-            format!("({})", self.unmasked_payload[1]),
-            self.payload[1],
-        ));
+        // Append border separating DWORD 1 and DWORD 2
+        result.push_str(
+            &format!(
+                "{0:7}{1}\n",
+                "",
+                border_color("+-------+-+-+-+-+-------+-+-------------+-------------------------------+")
+            )    
+        );
+        // Append the first line of DWORD 2
+        result.push_str(
+            &format!(
+                "{0:7}{1}{2:^7}{1}{3:^15}{1}{4:^15}{1}{5:^15}{1}{6:^15}{1}\n",
+                "",
+                border_color("|"),
+                dword_title_color("DWORD"),
+                byte_str(self.masking_key[2], 8),
+                byte_str(self.masking_key[3], 8),
+                byte_str(self.masked_payload[0], 8),
+                byte_str(self.masked_payload[1], 8),
+            )
+        );
+        // Append the second line of DWORD 2
+        result.push_str(
+            &format!(
+                "{0:7}{1}{2:^7}{1}{0:^31}{1}{0:1}{4:>5}{0:6}{3}{0:2}{5:>5}{0:6}{1}\n",
+                "",
+                border_color("|"),
+                dword_title_color("2"),
+                notes_color("MASKED"),
+                format!("({})", self.masked_payload[0]),
+                format!("({})", self.masked_payload[1]),
+            )
+        );
+        // Append the third line of DWORD 2
+        result.push_str(
+            &format!(
+                "{0:7}{1}{0:7}{1}{2:^31}{1}{3:^15}{1}{4:^15}{1}\n",
+                "",
+                border_color("|"),
+                notes_color("Masking-key (part 2)"),
+                byte_str(self.unmasked_payload[0], 8),
+                byte_str(self.unmasked_payload[1], 8),
+            )
+        );
+        // Append the fourth line of DWORD 2
+        result.push_str(
+            &format!(
+                "{0:7}{1}{0:7}{1}{3:^31}{1}{0:1}{5:>5}{0:1}{2}{6}{2}{0:1}{4}{0:1}{7:>5}{0:1}{2}{8}{2}{0:2}{1}\n",
+                "",
+                border_color("|"),
+                "'",
+                notes_color("(16 bits)"),
+                notes_color("UNMASKED"),
+                format!("({})", self.unmasked_payload[0]),
+                self.payload[0],
+                format!("({})", self.unmasked_payload[1]),
+                self.payload[1]
+            )
+        );
+        // Append the fifth line of DWORD 2
+        result.push_str(
+            &format!(
+                "{0:7}{1}{0:7}{1}{0:^31}{1}{2:^31}{1}\n",
+                "",
+                border_color("|"),
+                notes_color("Payload Data (part 1)")
+            )
+        );
+        // Append the bottom border
+        result.push_str(
+            &format!(
+                "{0:7}{1}",
+                "",
+                border_color("+-------+-------------------------------+-------------------------------+"),
+            )
+        );
 
         result
     }
