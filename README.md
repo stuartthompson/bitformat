@@ -5,17 +5,18 @@ Formats bit-focused data structurs for printing to the console or inclusion in l
 ## Warning - Very Early Release
 
 I created this crate to solve a specific problem. It is in a very early stage.
+
 *THERE WILL BE BUGS*
 
 ## Changelog
 
-v0.0.1 - Initial crate version
-v0.0.2 - Includes examples in README, adds changelog and roadmap
+* v0.0.1 - Initial crate version
+* v0.0.2 - Includes examples in README, adds changelog and roadmap
 
 ## Roadmap
 
-v0.0.5 - Support for styles (custom border glyphs, coloring)
-v0.1.0 - Support for WORD and DWORD tables _(in addition to QWORD)_
+* v0.0.5 - Support for styles (custom border glyphs, coloring)
+* v0.1.0 - Support for WORD and DWORD tables _(in addition to QWORD)_
 
 ## Specific Formats
 
@@ -27,6 +28,9 @@ Used to print bytes formatted as a table of QWORDs (32-bit) (8 bytes per row).
 
 #### Example
 
+The following is an example of the output produced by bitformat::QwordTable
+
+```
        +--------+--------+--------+--------+--------+--------+--------+--------+
  Bytes | Byte 0 | Byte 1 | Byte 2 | Byte 3 | Byte 4 | Byte 5 | Byte 6 | Byte 7 |
 +------+--------+--------+--------+--------+--------+--------+--------+--------+
@@ -36,6 +40,7 @@ Used to print bytes formatted as a table of QWORDs (32-bit) (8 bytes per row).
 |QWORD |11110010|
 |  2   |   (242)|
 +------+--------+
+```
 
 ### WebSocket Data Frame
 
@@ -44,6 +49,9 @@ https://tools.ietf.org/html/rfc6455#section-5.2
 
 #### Example
 
+The following is an example of the output produced by bitformat::WebSocketFrame
+
+```
                +---------------+---------------+---------------+---------------+
   Frame Data   |    Byte  0    |    Byte  1    |    Byte  2    |    Byte  3    |
    (Masked)    +---------------+---------------+---------------+---------------+
@@ -68,3 +76,4 @@ https://tools.ietf.org/html/rfc6455#section-5.2
        |       |  (99) 'c' UNM |
        |       | Payload pt 2  |
        +-------+---------------+
+```
