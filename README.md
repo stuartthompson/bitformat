@@ -2,9 +2,20 @@
 
 Formats bit-focused data structurs for printing to the console or inclusion in log files.
 
-## Very Early Release
+## Warning - Very Early Release
 
-I created this crate for my own use. It is in a very early stage. *THERE WILL BE BUGS*
+I created this crate to solve a specific problem. It is in a very early stage.
+*THERE WILL BE BUGS*
+
+## Changelog
+
+v0.0.1 - Initial crate version
+v0.0.2 - Includes examples in README, adds changelog and roadmap
+
+## Roadmap
+
+v0.0.5 - Support for styles (custom border glyphs, coloring)
+v0.1.0 - Support for WORD and DWORD tables _(in addition to QWORD)_
 
 ## Specific Formats
 
