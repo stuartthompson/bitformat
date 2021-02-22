@@ -1,0 +1,18 @@
+[package]
+name = "bitformat"
+version = "0.0.1"
+authors = ["Stuart Thompson <stuart@stuartthompson.net>"]
+edition = "2018"
+description = "Formats bit-focused data structure for printing to terminals and logs."
+documentation = "https://github.com/stuartthompson/bitformat/blob/master/README.md"
+readme = "README.md"
+homepage = "https://github.com/stuartthompson/bitformat"
+repository = "https://github.com/stuartthompson/bitformat"
+license = "GPL-3.0-or-later"
+keywords = ["terminal", "text", "format", "cli", "console"]
+categories = ["command-line-utilities", "command-line-interface", "development-tools", "development-tools::debugging"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64 = "0.12.1"
