@@ -1,3 +1,4 @@
+mod color;
 mod qword_table;
 mod websocket_frame;
 

@@ -1,10 +1,36 @@
+use colored::Colorize;
+use super::color::Color;
+
 const BITS_IN_BYTE: u8 = 8;
 const BYTES_IN_DWORD: u8 = 4;
+
+pub struct FormatStyle {
+    pub border_color: Color,
+    pub tick_mark_color: Color,
+    pub title_color: Color,
+    pub column_title_color: Color,
+    pub dword_title_color: Color,
+    pub notes_color: Color,
+}
+
+impl FormatStyle {
+    pub fn new() -> FormatStyle {
+        FormatStyle {
+            border_color: Color::Cyan,
+            tick_mark_color: Color::Green,
+            title_color: Color::White,
+            column_title_color: Color::Green,
+            dword_title_color: Color::Green,
+            notes_color: Color::Magenta,
+        }
+    }
+}
 
 pub struct WebSocketFrame<'a> {
     pub frame_len: u8,
     pub is_payload_masked: bool,
     pub is_short_payload: bool,
+    pub format_style: FormatStyle,
     fin_bit: bool,
     rsv1: bool,
     rsv2: bool,
@@ -61,6 +87,8 @@ impl<'a> WebSocketFrame<'a> {
             is_payload_masked,
             // Short payloads are <= 126 chars in length
             is_short_payload: payload_len <= 126,
+            // Use default format style
+            format_style: FormatStyle::new(),
             // Bit 0 contains fin bit
             fin_bit: get_bit(data[0], 0),
             // Bit 1 contains rsv1
@@ -93,42 +121,7 @@ impl<'a> WebSocketFrame<'a> {
     pub fn format(self: &WebSocketFrame<'a>) -> String {
         let mut result = self.format_header();
 
-        result.push_str(&format!(
-            "       +-------+-+-+-+-+-------+-+-------------+-------------------------------+
-       | DWORD |{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}|
-       |   1   |F|R|R|R|       |M|             |                               |
-       |       |I|S|S|S|op code|A| Payload len |     Masking-key (part 1)      |
-       |       |N|V|V|V| (4 b) |S|  (7 bits)   |           (16 bits)           |
-       |       | |1|2|3|       |K|             |                               |
-       +-------+-+-+-+-+-------+-+-------------+-------------------------------+
-       | DWORD |{9}|{10}|{11}|{12}|
-       |   2   |                               | {13:>5}      MASKED  {14:>5}      |
-       |       |     Masking-key (part 2)      |{15}|{16}|
-       |       |           (16 bits)           | {17:>5} '{18}' UNMASKED {19:>5} '{20}'  |
-       |       |                               |     Payload Data (part 1)     |       
-       +-------+-------------------------------+-------------------------------+",
-            bit_str(self.fin_bit),
-            bit_str(self.rsv1),
-            bit_str(self.rsv2),
-            bit_str(self.rsv3),
-            byte_str(self.opcode, 4),
-            bit_str(self.mask_bit),
-            byte_str(self.payload_len, 7),
-            byte_str(self.masking_key[0], 8),
-            byte_str(self.masking_key[1], 8),
-            byte_str(self.masking_key[2], 8),
-            byte_str(self.masking_key[3], 8),
-            byte_str(self.masked_payload[0], 8),
-            byte_str(self.masked_payload[1], 8),
-            format!("({})", self.masked_payload[0]),
-            format!("({})", self.masked_payload[1]),
-            byte_str(self.unmasked_payload[0], 8),
-            byte_str(self.unmasked_payload[1], 8),
-            format!("({})", self.unmasked_payload[0]),
-            self.payload[0],
-            format!("({})", self.unmasked_payload[1]),
-            self.payload[1],
-        ));
+        result.push_str(&self.format_first_two_dwords());
 
         // Format remaining full dwords
         let remaining_payload_dwords: u8 = (self.payload_len - 2).div_euclid(BYTES_IN_DWORD);
@@ -160,39 +153,183 @@ impl<'a> WebSocketFrame<'a> {
     ///
     /// * `self` The WebSocket frame being formatted.
     fn format_header(self: &WebSocketFrame<'a>) -> String {
-        // Start the with top border
-        let mut result: String = format!("{0:15}{1}\n", " ","+---------------+---------------+---------------+---------------+");
+        // Closures to help apply style colors
+        let border_color = |s: &str| s.color(self.format_style.border_color.to_string());
+        let tick_color = |s: &str| s.color(self.format_style.tick_mark_color.to_string());
+        let title_color = |s: &str| s.color(self.format_style.title_color.to_string());
+        let column_title_color = |s: &str| s.color(self.format_style.column_title_color.to_string());
+
+        // Start with the top border
+        let mut result: String = 
+            format!(
+                "{0:15}{1}\n", 
+                "",
+                border_color("+---------------+---------------+---------------+---------------+")
+            );
 
         // Append column headers
-        result.push_str(&format!("{0:2}{1}\n", " ", "Frame Data   |    Byte  0    |    Byte  1    |    Byte  2    |    Byte  3    |"));
+        result.push_str(
+            &format!(
+                "{0:2}{2}{0:3}{1}{3:^15}{1}{4:^15}{1}{5:^15}{1}{6:^15}{1}\n", 
+                "", 
+                border_color("|"),
+                title_color("Frame Data"),
+                column_title_color("Byte  1"),
+                column_title_color("Byte  2"),
+                column_title_color("Byte  3"),
+                column_title_color("Byte  4")
+            )
+        );
+        // Append divider (between byte headers and bit tick marks)
         result.push_str(
             &format!(
                 "{0:2}{1}\n", 
                 " ",
                 format!(
-                    "{0:^10}   +---------------+---------------+---------------+---------------+",
-                    if self.is_payload_masked { "(Masked)" } else { "(Unmasked)" }
+                    "{0:^10}{1:3}{2}",
+                    if self.is_payload_masked { title_color("(Masked)") } else { title_color("(Unmasked)") },
+                    "",
+                    border_color("+---------------+---------------+---------------+---------------+"),
                 )
-            ));
+            )
+        );
+        // Append tens tick marks
         result.push_str(
             &format!(
-                "{0:2}{1}\n",
-                " ",
-                format!(
-                    "{0:^10}   |0              |    1          |        2      |            3  |",
-                    if self.is_short_payload { "(Short)" } else { "(Long)" }
-                )
-            ));
+                "{0:2}{1:^10}{0:3}{2}{3}{0:14}{2}{0:4}{4}{0:10}{2}{0:8}{5}{0:6}{2}{0:12}{6}{0:2}{2}\n",
+                "",
+                if self.is_short_payload { title_color("(Short)") } else { title_color("(Long)") },
+                border_color("|"),
+                tick_color("0"),
+                tick_color("1"),
+                tick_color("2"),
+                tick_color("3")
+            )
+        );
+        // Append unit tick marks
         result.push_str(
             &format!(
-                "{0:5}{1}\n",
-                " ",
-                format!(
-                    "{0:10}{1}", 
-                    " ", 
-                    "|0 1 2 3 4 5 6 7|8 9 0 1 2 3 4 5|6 7 8 9 0 1 2 3|4 5 6 7 8 9 0 1|",
-                )
-            ));
+                "{0:15}{1}{2}{1}{3}{1}{4}{1}{5}{1}\n",
+                "",
+                border_color("|"),
+                tick_color("0 1 2 3 4 5 6 7"),
+                tick_color("8 9 0 1 2 3 4 5"),
+                tick_color("6 7 8 9 0 1 2 3"),
+                tick_color("4 5 6 7 8 9 0 1")
+            )
+        );
+        
+        result
+    }
+
+    fn format_first_two_dwords(
+        self: &WebSocketFrame<'a>
+    ) -> String {
+        // Closures to help apply style colors
+        let border_color = |s: &str| s.color(self.format_style.border_color.to_string());
+        let tick_color = |s: &str| s.color(self.format_style.tick_mark_color.to_string());
+        let title_color = |s: &str| s.color(self.format_style.title_color.to_string());
+        let column_title_color = |s: &str| s.color(self.format_style.column_title_color.to_string());
+        let dword_title_color = |s: &str| s.color(self.format_style.dword_title_color.to_string());
+        let notes_color = |s: &str| s.color(self.format_style.notes_color.to_string());
+
+        // Start with the top border
+        let mut result: String = 
+            format!(
+                "{0:7}{1}\n", 
+                "",
+                border_color("+-------+---------------+---------------+---------------+---------------+")
+            );
+        // Append the bit values line
+        result.push_str(
+            &format!(
+                "{0:7}{1}{2:^7}{1}{3}{1}{4}{1}{5}{1}{6}{1}{7}{1}{8}{1}{9}{1}{10}{1}{11}{1}\n",
+                "",
+                border_color("|"),
+                dword_title_color("DWORD"),
+                bit_str(self.fin_bit),
+                bit_str(self.rsv1),
+                bit_str(self.rsv2),
+                bit_str(self.rsv3),
+                byte_str(self.opcode, 4),
+                bit_str(self.mask_bit),
+                byte_str(self.payload_len, 7),
+                byte_str(self.masking_key[0], 8),
+                byte_str(self.masking_key[1], 8),
+            )
+        );
+        // Append the first line of bit identifiers
+        result.push_str(
+            &format!(
+                "{0:7}{1}{2:^7}{1}{3}{1}{4}{1}{4}{1}{4}{1}{0:7}{1}{5}{1}{0:13}{1}{0:31}{1}\n",
+                "",
+                border_color("|"),
+                dword_title_color("1"),
+                notes_color("F"),
+                notes_color("R"),
+                notes_color("M")
+            )
+        );
+        // Append the second line of bit identifiers
+        result.push_str(
+            &format!(
+                "{0:7}{1}{0:7}{1}{2}{1}{3}{1}{3}{1}{3}{1}{4:7}{1}{5}{1}{6:^13}{1}{7:^31}{1}\n",
+                "",
+                border_color("|"),
+                notes_color("I"),
+                notes_color("S"),
+                notes_color("op code"),
+                notes_color("A"),
+                notes_color("Payload len"),
+                notes_color("Masking-key (part 1)"),
+            )
+        );
+        // Append the third line of bit identifiers
+        result.push_str(
+            &format!(
+                "{0:7}{1}{0:7}{1}{2}{1}{3}{1}{3}{1}{3}{1}{4:^7}{1}{5}{1}{6:^13}{1}{0:31}{1}\n",
+                "",
+                border_color("|"),
+                notes_color("N"),
+                notes_color("V"),
+                notes_color("(4 b)"),
+                notes_color("S"),
+                notes_color("(7 bits)"),
+            )
+        );
+        // Append the final line of bit identifiers
+        result.push_str(
+            &format!(
+                "{0:7}{1}{0:7}{1}{0:1}{1}{2}{1}{3}{1}{4}{1}{0:7}{1}{5}{1}{0:13}{1}{0:31}{1}\n",
+                "",
+                border_color("|"),
+                notes_color("1"),
+                notes_color("2"),
+                notes_color("3"),
+                notes_color("K"),
+            )
+        );
+        result.push_str(&format!(
+       "+-------+-+-+-+-+-------+-+-------------+-------------------------------+
+       | DWORD |{0}|{1}|{2}|{3}|
+       |   2   |                               | {4:>5}      MASKED  {5:>5}      |
+       |       |     Masking-key (part 2)      |{6}|{7}|
+       |       |           (16 bits)           | {8:>5} '{9}' UNMASKED {10:>5} '{11}'  |
+       |       |                               |     Payload Data (part 1)     |       
+       +-------+-------------------------------+-------------------------------+",
+            byte_str(self.masking_key[2], 8),
+            byte_str(self.masking_key[3], 8),
+            byte_str(self.masked_payload[0], 8),
+            byte_str(self.masked_payload[1], 8),
+            format!("({})", self.masked_payload[0]),
+            format!("({})", self.masked_payload[1]),
+            byte_str(self.unmasked_payload[0], 8),
+            byte_str(self.unmasked_payload[1], 8),
+            format!("({})", self.unmasked_payload[0]),
+            self.payload[0],
+            format!("({})", self.unmasked_payload[1]),
+            self.payload[1],
+        ));
 
         result
     }
@@ -405,8 +542,8 @@ mod tests {
         let frame = WebSocketFrame::from_bytes(&bytes);
         let expected = "               +---------------+---------------+---------------+---------------+\n  Frame Data   |    Byte  0    |    Byte  1    |    Byte  2    |    Byte  3    |\n   (Masked)    +---------------+---------------+---------------+---------------+\n   (Short)     |0              |    1          |        2      |            3  |\n               |0 1 2 3 4 5 6 7|8 9 0 1 2 3 4 5|6 7 8 9 0 1 2 3|4 5 6 7 8 9 0 1|\n       +-------+-+-+-+-+-------+-+-------------+-------------------------------+\n       | DWORD |1|0|0|0|0 0 0 1|1|0 0 0 0 0 1 1|0 1 0 1 1 0 1 0|0 0 0 0 1 1 1 0|\n       |   1   |F|R|R|R|       |M|             |                               |\n       |       |I|S|S|S|op code|A| Payload len |     Masking-key (part 1)      |\n       |       |N|V|V|V| (4 b) |S|  (7 bits)   |           (16 bits)           |\n       |       | |1|2|3|       |K|             |                               |\n       +-------+-+-+-+-+-------+-+-------------+-------------------------------+\n       | DWORD |1 0 0 1 0 0 0 1|0 0 1 1 0 1 1 0|0 0 1 1 1 0 1 1|0 1 1 0 1 1 0 0|\n       |   2   |                               |  (59)      MASKED  (108)      |\n       |       |     Masking-key (part 2)      |0 1 1 0 0 0 0 1|0 1 1 0 0 0 1 0|\n       |       |           (16 bits)           |  (97) \'a\' UNMASKED  (98) \'b\'  |\n       |       |                               |     Payload Data (part 1)     |       \n       +-------+-------------------------------+-------------------------------+\n       | DWORD |1 1 1 1 0 0 1 0|\n       |   3   | (242)     MSK |\n       |       |0 1 1 0 0 0 1 1|\n       |       |  (99) \'c\' UNM |\n       |       | Payload pt 2  |\n       +-------+---------------+\n";
         
-        // println!("1-------10--------20--------30--------40--------50--------60--------70--------80");
-        // println!("{}", frame.format());
+        println!("1-------10--------20--------30--------40--------50--------60--------70--------80");
+        println!("{}", frame.format());
 
         assert_eq!(frame.format(), expected);
     }

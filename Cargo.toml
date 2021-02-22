@@ -16,3 +16,4 @@ categories = ["command-line-utilities", "command-line-interface", "development-t
 
 [dependencies]
 base64 = "0.12.1"
+colored = "2.0.0"
