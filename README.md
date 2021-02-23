@@ -13,10 +13,12 @@ I created this crate to solve a specific problem. It is in a very early stage.
 * v0.0.1 - Initial crate version
 * v0.0.2 - Includes examples in README, adds changelog and roadmap
 * v0.0.3 - README formatting updates
+* v0.0.4 - Custom style colors for websocket data frame
 
 ## Roadmap
 
-* v0.0.5 - Support for styles (custom border glyphs, coloring)
+* v0.0.5 - Support for styles in qword table (custom colors)
+* v0.0.6 - Support for custom border glyphs
 * v0.1.0 - Support for WORD and DWORD tables _(in addition to QWORD)_
 
 ## Specific Formats

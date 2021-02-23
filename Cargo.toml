@@ -1,6 +1,6 @@
 [package]
 name = "bitformat"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Stuart Thompson <stuart@stuartthompson.net>"]
 edition = "2018"
 description = "Formats bit-focused data structure for printing to terminals and logs."
