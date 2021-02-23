@@ -11,6 +11,10 @@ pub struct FormatStyle {
     pub column_title_color: Color,
     pub dword_title_color: Color,
     pub notes_color: Color,
+    pub bit_color: Color,
+    pub unmasked_payload_bit_color: Color,
+    pub byte_value_color: Color,
+    pub char_color: Color,
 }
 
 impl FormatStyle {
@@ -22,6 +26,10 @@ impl FormatStyle {
             column_title_color: Color::Green,
             dword_title_color: Color::Green,
             notes_color: Color::Magenta,
+            bit_color: Color::White,
+            unmasked_payload_bit_color: Color::Yellow,
+            byte_value_color: Color::Blue,
+            char_color: Color::Red,
         }
     }
 }
@@ -227,11 +235,12 @@ impl<'a> WebSocketFrame<'a> {
     ) -> String {
         // Closures to help apply style colors
         let border_color = |s: &str| s.color(self.format_style.border_color.to_string());
-        let tick_color = |s: &str| s.color(self.format_style.tick_mark_color.to_string());
-        let title_color = |s: &str| s.color(self.format_style.title_color.to_string());
-        let column_title_color = |s: &str| s.color(self.format_style.column_title_color.to_string());
         let dword_title_color = |s: &str| s.color(self.format_style.dword_title_color.to_string());
         let notes_color = |s: &str| s.color(self.format_style.notes_color.to_string());
+        let bit_color = |s: &str| s.color(self.format_style.bit_color.to_string());
+        let unmasked_payload_bit_color = |s: &str| s.color(self.format_style.unmasked_payload_bit_color.to_string());
+        let byte_value_color = |s: &str| s.color(self.format_style.byte_value_color.to_string());
+        let char_color = |s: &str| s.color(self.format_style.char_color.to_string());
 
         // Start with the top border
         let mut result: String = 
@@ -240,22 +249,22 @@ impl<'a> WebSocketFrame<'a> {
                 "",
                 border_color("+-------+---------------+---------------+---------------+---------------+")
             );
-        // Append the bit values line
+        // Line 1: DWORD 1 bit values
         result.push_str(
             &format!(
                 "{0:7}{1}{2:^7}{1}{3}{1}{4}{1}{5}{1}{6}{1}{7}{1}{8}{1}{9}{1}{10}{1}{11}{1}\n",
                 "",
                 border_color("|"),
                 dword_title_color("DWORD"),
-                bit_str(self.fin_bit),
-                bit_str(self.rsv1),
-                bit_str(self.rsv2),
-                bit_str(self.rsv3),
-                byte_str(self.opcode, 4),
-                bit_str(self.mask_bit),
-                byte_str(self.payload_len, 7),
-                byte_str(self.masking_key[0], 8),
-                byte_str(self.masking_key[1], 8),
+                bit_color(bit_str(self.fin_bit)),
+                bit_color(bit_str(self.rsv1)),
+                bit_color(bit_str(self.rsv2)),
+                bit_color(bit_str(self.rsv3)),
+                bit_color(&byte_str(self.opcode, 4)),
+                bit_color(bit_str(self.mask_bit)),
+                bit_color(&byte_str(self.payload_len, 7)),
+                bit_color(&byte_str(self.masking_key[0], 8)),
+                bit_color(&byte_str(self.masking_key[1], 8)),
             )
         );
         // Append the first line of bit identifiers
@@ -324,10 +333,10 @@ impl<'a> WebSocketFrame<'a> {
                 "",
                 border_color("|"),
                 dword_title_color("DWORD"),
-                byte_str(self.masking_key[2], 8),
-                byte_str(self.masking_key[3], 8),
-                byte_str(self.masked_payload[0], 8),
-                byte_str(self.masked_payload[1], 8),
+                bit_color(&byte_str(self.masking_key[2], 8)),
+                bit_color(&byte_str(self.masking_key[3], 8)),
+                bit_color(&byte_str(self.masked_payload[0], 8)),
+                bit_color(&byte_str(self.masked_payload[1], 8)),
             )
         );
         // Append the second line of DWORD 2
@@ -338,8 +347,8 @@ impl<'a> WebSocketFrame<'a> {
                 border_color("|"),
                 dword_title_color("2"),
                 notes_color("MASKED"),
-                format!("({})", self.masked_payload[0]),
-                format!("({})", self.masked_payload[1]),
+                byte_value_color(&format!("({})", self.masked_payload[0])),
+                byte_value_color(&format!("({})", self.masked_payload[1])),
             )
         );
         // Append the third line of DWORD 2
@@ -349,23 +358,22 @@ impl<'a> WebSocketFrame<'a> {
                 "",
                 border_color("|"),
                 notes_color("Masking-key (part 2)"),
-                byte_str(self.unmasked_payload[0], 8),
-                byte_str(self.unmasked_payload[1], 8),
+                unmasked_payload_bit_color(&byte_str(self.unmasked_payload[0], 8)),
+                unmasked_payload_bit_color(&byte_str(self.unmasked_payload[1], 8)),
             )
         );
         // Append the fourth line of DWORD 2
         result.push_str(
             &format!(
-                "{0:7}{1}{0:7}{1}{3:^31}{1}{0:1}{5:>5}{0:1}{2}{6}{2}{0:1}{4}{0:1}{7:>5}{0:1}{2}{8}{2}{0:2}{1}\n",
+                "{0:7}{1}{0:7}{1}{2:^31}{1}{0:1}{4:>5}{0:1}{5:3}{0:1}{3}{0:1}{6:>5}{0:1}{7:3}{0:2}{1}\n",
                 "",
                 border_color("|"),
-                "'",
                 notes_color("(16 bits)"),
                 notes_color("UNMASKED"),
-                format!("({})", self.unmasked_payload[0]),
-                self.payload[0],
-                format!("({})", self.unmasked_payload[1]),
-                self.payload[1]
+                byte_value_color(&format!("({})", self.unmasked_payload[0])),
+                char_color(&format!("'{0}'", &self.payload[0])),
+                byte_value_color(&format!("({})", self.unmasked_payload[1])),
+                char_color(&format!("'{0}'", &self.payload[1]))
             )
         );
         // Append the fifth line of DWORD 2
@@ -380,7 +388,7 @@ impl<'a> WebSocketFrame<'a> {
         // Append the bottom border
         result.push_str(
             &format!(
-                "{0:7}{1}",
+                "{0:7}{1}\n",
                 "",
                 border_color("+-------+-------------------------------+-------------------------------+"),
             )
@@ -400,6 +408,15 @@ impl<'a> WebSocketFrame<'a> {
         dword_number: u8,
         part_number: u8,
     ) -> String {
+        // Closures to help apply style colors
+        let border_color = |s: &str| s.color(self.format_style.border_color.to_string());
+        let dword_title_color = |s: &str| s.color(self.format_style.dword_title_color.to_string());
+        let notes_color = |s: &str| s.color(self.format_style.notes_color.to_string());
+        let bit_color = |s: &str| s.color(self.format_style.bit_color.to_string());
+        let unmasked_payload_bit_color = |s: &str| s.color(self.format_style.unmasked_payload_bit_color.to_string());
+        let char_color = |s: &str| s.color(self.format_style.char_color.to_string());
+        let byte_value_color = |s: &str| s.color(self.format_style.byte_value_color.to_string());
+        
         let mut result: String = String::from("");
 
         // Calculate number of bytes to include in this row
@@ -417,123 +434,174 @@ impl<'a> WebSocketFrame<'a> {
                 to_byte_ix));
         }
 
-        let delim = |d: u8| format!("({})", d);
-        let indent = |s: &str| format!("       {}", s);
-
-        // Format masked bits
-        result.push_str("\n       | DWORD |");
+        // Format masked bits (line 1)
+        result.push_str(
+            &format!(
+                "{0:7}{1}{2:^7}{1}",
+                "",
+                border_color("|"),
+                dword_title_color("DWORD"),
+            )
+        );
         result.push_str(
             &(0..num_bytes)
-                .map(|i| format!("{}|", byte_str(masked_bits[i], BITS_IN_BYTE)))
+                .map(|i| format!(
+                    "{1}{0}",
+                    border_color("|"), 
+                    bit_color(&byte_str(masked_bits[i], BITS_IN_BYTE))))
                 .collect::<String>(),
         );
         result.push_str("\n");
 
-        // Format masked char previews
-        result.push_str(&indent(&format!("| {:^5} |", dword_number)));
+        // Line 2: Masked char previews
+        result.push_str(
+            &format!(
+                "{0:7}{1}{2:^7}{1}",
+                "",
+                border_color("|"),
+                dword_title_color(&dword_number.to_string())
+            )
+        );
         match num_bytes {
             1 => result.push_str(&format!(
-                " {:>5}     MSK |",
-                format!("({})", masked_bits[0])
+                "{0:1}{3:>5}{0:5}{2}{0:1}{1}",
+                "",
+                border_color("|"),
+                notes_color("MSK"),
+                byte_value_color(&format!("({})", masked_bits[0]))
             )),
             2 => result.push_str(&format!(
-                " {0:>5}      MASKED  {1:>5}      |",
-                delim(masked_bits[0]),
-                delim(masked_bits[1])
+                "{0:1}{3:>5}{0:6}{2}{0:2}{4:>5}{0:6}{1}",
+                "",
+                border_color("|"),
+                notes_color("MASKED"),
+                byte_value_color(&format!("({})", masked_bits[0])),
+                byte_value_color(&format!("({})", masked_bits[1]))
             )),
             3 => result.push_str(&format!(
-                " {0:>5}      MASKED  {1:>5}      | {2:>5}     MSK |",
-                delim(masked_bits[0]),
-                delim(masked_bits[1]),
-                delim(masked_bits[2])
+                "{0:1}{4:>5}{0:6}{2}{0:2}{5:>5}{0:6}{1}{0:1}{6:>5}{0:5}{3}{0:1}{1}",
+                "",
+                border_color("|"),
+                notes_color("MASKED"),
+                notes_color("MSK"),
+                byte_value_color(&format!("({})", masked_bits[0])),
+                byte_value_color(&format!("({})", masked_bits[1])),
+                byte_value_color(&format!("({})", masked_bits[2]))
             )),
             4 => result.push_str(&format!(
-                " {0:>5}      MASKED  {1:>5}      | {2:>5}      MASKED  {3:>5}      |",
-                delim(masked_bits[0]),
-                delim(masked_bits[1]),
-                delim(masked_bits[2]),
-                delim(masked_bits[3])
+                "{0:1}{4:>5}{0:6}{2}{0:2}{5:>5}{0:6}{1}{0:1}{6:>5}{0:6}{3}{0:2}{7:>5}{0:6}{1}",
+                "",
+                border_color("|"),
+                notes_color("MASKED"),
+                notes_color("MSK"),
+                byte_value_color(&format!("({})", masked_bits[0])),
+                byte_value_color(&format!("({})", masked_bits[1])),
+                byte_value_color(&format!("({})", masked_bits[2])),
+                byte_value_color(&format!("({})", masked_bits[3]))
             )),
             _ => {}
         }
         result.push_str("\n");
 
-        // Format unmasked bits
-        result.push_str(&indent("|       |"));
+        // Line 3: Unmasked bits
+        result.push_str(
+            &format!(
+                "{0:7}{1}{0:7}{1}",
+                "",
+                border_color("|")
+            )
+        );
         result.push_str(
             &(0..num_bytes)
-                .map(|i| format!("{}|", byte_str(unmasked_bits[i], BITS_IN_BYTE)))
+                .map(|i| format!("{1}{0}", border_color("|"), unmasked_payload_bit_color(&byte_str(unmasked_bits[i], BITS_IN_BYTE))))
                 .collect::<String>(),
         );
         result.push_str("\n");
 
-        // Format unmasked char previews
-        result.push_str(&indent("|       |"));
+        // Line 4: Unmasked char previews
+        result.push_str(&format!("{0:7}{1}{0:7}{1}", "", border_color("|")));
         match num_bytes {
             1 => result.push_str(&format!(
-                " {0:>5} '{1}' UNM |",
-                delim(unmasked_bits[0]),
-                payload_data[0]
+                "{0:1}{3:>5}{0:1}{4}{0:1}{2}{0:1}{1}",
+                "",
+                border_color("|"),
+                notes_color("UNM"),
+                byte_value_color(&format!("({})", unmasked_bits[0])),
+                char_color(&format!("'{0}'", payload_data[0]))
             )),
             2 => result.push_str(&format!(
-                " {0:>5} '{1}' UNMASKED {2:>5} '{3}'  |",
-                delim(unmasked_bits[0]),
-                payload_data[0],
-                delim(unmasked_bits[1]),
-                payload_data[1]
+                "{0:1}{3:>5}{0:1}{4:3}{0:1}{2}{0:1}{5:>5}{0:1}{6:3}{0:2}{1}",
+                "",
+                border_color("|"),
+                notes_color("UNMASKED"),
+                byte_value_color(&format!("({})", unmasked_bits[0])),
+                char_color(&format!("'{}'", payload_data[0])),
+                byte_value_color(&format!("({})", unmasked_bits[1])),
+                char_color(&format!("'{}'", payload_data[1]))
             )),
             3 => result.push_str(&format!(
-                " {0:>5} '{1}' UNMASKED {2:>5} '{3}'  | {4:>5} '{5}' UNM |",
-                delim(unmasked_bits[0]),
-                payload_data[0],
-                delim(unmasked_bits[1]),
-                payload_data[1],
-                delim(unmasked_bits[2]),
-                payload_data[2],
+                "{0:1}{4:>5}{0:1}{5:3}{0:1}{2}{0:1}{6:>5}{0:1}{7:3}{0:2}{1}{0:1}{8:>5}{0:1}{9:3}{0:1}{3}{0:1}{1}",
+                "",
+                border_color("|"),
+                notes_color("UNMASKED"),
+                notes_color("UNM"),
+                byte_value_color(&format!("({})", unmasked_bits[0])),
+                char_color(&format!("'{}'", payload_data[0])),
+                byte_value_color(&format!("({})", unmasked_bits[1])),
+                char_color(&format!("'{}'", payload_data[1])),
+                byte_value_color(&format!("({})", unmasked_bits[2])),
+                char_color(&format!("'{}'", payload_data[2])),
             )),
             4 => result.push_str(&format!(
-                " {0:>5} '{1}' UNMASKED {2:>5} '{3}'  | {4:>5} '{5}' UNMASKED {6:>5} '{7}'  |",
-                delim(unmasked_bits[0]),
-                payload_data[0],
-                delim(unmasked_bits[1]),
-                payload_data[1],
-                delim(unmasked_bits[2]),
-                payload_data[2],
-                delim(unmasked_bits[3]),
-                payload_data[3],
+                "{0:1}{3:>5}{0:1}{4:3}{0:1}{2}{0:1}{5:>5}{0:1}{6:3}{0:2}{1}{0:1}{7:>5}{0:1}{8:3}{0:1}{2}{0:1}{9:>5}{0:1}{10:3}{0:2}{1}",
+                "",
+                border_color("|"),
+                notes_color("UNMASKED"),
+                byte_value_color(&format!("({})", unmasked_bits[0])),
+                char_color(&format!("'{}'", payload_data[0])),
+                byte_value_color(&format!("({})", unmasked_bits[1])),
+                char_color(&format!("'{}'", payload_data[1])),
+                byte_value_color(&format!("({})", unmasked_bits[2])),
+                char_color(&format!("'{}'", payload_data[2])),
+                byte_value_color(&format!("({})", unmasked_bits[3])),
+                char_color(&format!("'{}'", payload_data[3])),
             )),
             _ => {}
         }
         result.push_str("\n");
 
-        // Format payload part text
-        result.push_str(&indent("|       |"));
+        // Line 5: Payload part
+        result.push_str(&format!("{0:7}{1}{0:7}{1}", "", border_color("|")));
         match num_bytes {
             1 => result.push_str(&format!(
-                "{:^15}|",
-                format!("Payload pt {}", part_number)
+                "{1:^15}{0}",
+                border_color("|"),
+                notes_color(&format!("Payload pt {}", part_number))
             )),
             2 => result.push_str(&format!(
-                "{:^31}|",
-                format!("Payload Data (part {})", part_number)
+                "{1:^31}{0}",
+                border_color("|"),
+                notes_color(&format!("Payload Data (part {})", part_number))
             )),
             3 => result.push_str(&format!(
-                "{0:^47}|",
-                format!("Payload Data (part {})", part_number),
+                "{1:^47}{0}",
+                border_color("|"),
+                notes_color(&format!("Payload Data (part {})", part_number)),
             )),
             4 => result.push_str(&format!(
-                "{0:^63}|",
-                format!("Payload Data (part {})", part_number),
+                "{1:^63}{0}",
+                border_color("|"),
+                notes_color(&format!("Payload Data (part {})", part_number)),
             )),
             _ => {}
         }
         result.push_str("\n");
 
         // Format bottom border
-        result.push_str(&indent("+-------+"));
+        result.push_str(&format!("{0:7}{1}", "", border_color("+-------+")));
         result.push_str(
             &(0..num_bytes)
-                .map(|_| "---------------+")
+                .map(|_| border_color("---------------+").to_string())
                 .collect::<String>(),
         );
         result.push_str("\n");
@@ -595,10 +663,10 @@ mod tests {
         let bytes = base64::decode("gYNaDpE2O2zy").unwrap();
 
         let frame = WebSocketFrame::from_bytes(&bytes);
-        let expected = "               +---------------+---------------+---------------+---------------+\n  Frame Data   |    Byte  0    |    Byte  1    |    Byte  2    |    Byte  3    |\n   (Masked)    +---------------+---------------+---------------+---------------+\n   (Short)     |0              |    1          |        2      |            3  |\n               |0 1 2 3 4 5 6 7|8 9 0 1 2 3 4 5|6 7 8 9 0 1 2 3|4 5 6 7 8 9 0 1|\n       +-------+-+-+-+-+-------+-+-------------+-------------------------------+\n       | DWORD |1|0|0|0|0 0 0 1|1|0 0 0 0 0 1 1|0 1 0 1 1 0 1 0|0 0 0 0 1 1 1 0|\n       |   1   |F|R|R|R|       |M|             |                               |\n       |       |I|S|S|S|op code|A| Payload len |     Masking-key (part 1)      |\n       |       |N|V|V|V| (4 b) |S|  (7 bits)   |           (16 bits)           |\n       |       | |1|2|3|       |K|             |                               |\n       +-------+-+-+-+-+-------+-+-------------+-------------------------------+\n       | DWORD |1 0 0 1 0 0 0 1|0 0 1 1 0 1 1 0|0 0 1 1 1 0 1 1|0 1 1 0 1 1 0 0|\n       |   2   |                               |  (59)      MASKED  (108)      |\n       |       |     Masking-key (part 2)      |0 1 1 0 0 0 0 1|0 1 1 0 0 0 1 0|\n       |       |           (16 bits)           |  (97) \'a\' UNMASKED  (98) \'b\'  |\n       |       |                               |     Payload Data (part 1)     |       \n       +-------+-------------------------------+-------------------------------+\n       | DWORD |1 1 1 1 0 0 1 0|\n       |   3   | (242)     MSK |\n       |       |0 1 1 0 0 0 1 1|\n       |       |  (99) \'c\' UNM |\n       |       | Payload pt 2  |\n       +-------+---------------+\n";
+        let expected = "               \u{1b}[36m+---------------+---------------+---------------+---------------+\u{1b}[0m\n  \u{1b}[37mFrame Data\u{1b}[0m   \u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  1    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  2    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  3    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  4    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n  \u{1b}[37m (Masked) \u{1b}[0m   \u{1b}[36m+---------------+---------------+---------------+---------------+\u{1b}[0m\n  \u{1b}[37m (Short)  \u{1b}[0m   \u{1b}[36m|\u{1b}[0m\u{1b}[32m0\u{1b}[0m              \u{1b}[36m|\u{1b}[0m    \u{1b}[32m1\u{1b}[0m          \u{1b}[36m|\u{1b}[0m        \u{1b}[32m2\u{1b}[0m      \u{1b}[36m|\u{1b}[0m            \u{1b}[32m3\u{1b}[0m  \u{1b}[36m|\u{1b}[0m\n               \u{1b}[36m|\u{1b}[0m\u{1b}[32m0 1 2 3 4 5 6 7\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m8 9 0 1 2 3 4 5\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m6 7 8 9 0 1 2 3\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m4 5 6 7 8 9 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+---------------+---------------+---------------+---------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 0 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 1 0 1 1 0 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 0 1 1 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   1   \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mF\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mM\u{1b}[0m\u{1b}[36m|\u{1b}[0m             \u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mI\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mop code\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mA\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m Payload len \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m     Masking-key (part 1)      \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mN\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m (4 b) \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m  (7 bits)   \u{1b}[0m\u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m \u{1b}[36m|\u{1b}[0m\u{1b}[35m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m2\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m3\u{1b}[0m\u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mK\u{1b}[0m\u{1b}[36m|\u{1b}[0m             \u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+-+-+-+-+-------+-+-------------+-------------------------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1 0 0 1 0 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 1 1 0 1 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 1 1 1 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 1 1 0 1 1 0 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   2   \u{1b}[0m\u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m \u{1b}[34m (59)\u{1b}[0m      \u{1b}[35mMASKED\u{1b}[0m  \u{1b}[34m(108)\u{1b}[0m      \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m     Masking-key (part 2)      \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 0 0 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 0 0 0 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m           (16 bits)           \u{1b}[0m\u{1b}[36m|\u{1b}[0m \u{1b}[34m (97)\u{1b}[0m \u{1b}[31m\'a\'\u{1b}[0m \u{1b}[35mUNMASKED\u{1b}[0m \u{1b}[34m (98)\u{1b}[0m \u{1b}[31m\'b\'\u{1b}[0m  \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\u{1b}[35m     Payload Data (part 1)     \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+-------------------------------+-------------------------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1 1 1 1 0 0 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   3   \u{1b}[0m\u{1b}[36m|\u{1b}[0m \u{1b}[34m(242)\u{1b}[0m     \u{1b}[35mMSK\u{1b}[0m \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 0 0 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m \u{1b}[34m (99)\u{1b}[0m \u{1b}[31m\'c\'\u{1b}[0m \u{1b}[35mUNM\u{1b}[0m \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m Payload pt 2  \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+\u{1b}[0m\u{1b}[36m---------------+\u{1b}[0m\n";
         
-        println!("1-------10--------20--------30--------40--------50--------60--------70--------80");
-        println!("{}", frame.format());
+        // println!("1-------10--------20--------30--------40--------50--------60--------70--------80");
+        // println!("{}", frame.format());
 
         assert_eq!(frame.format(), expected);
     }
