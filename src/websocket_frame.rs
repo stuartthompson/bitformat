@@ -493,7 +493,7 @@ impl<'a> WebSocketFrame<'a> {
                 "",
                 border_color("|"),
                 notes_color("MASKED"),
-                notes_color("MSK"),
+                notes_color("MASKED"),
                 byte_value_color(&format!("({})", masked_bits[0])),
                 byte_value_color(&format!("({})", masked_bits[1])),
                 byte_value_color(&format!("({})", masked_bits[2])),
