@@ -43,13 +43,27 @@ pub struct WebSocketFrame<'a> {
     rsv1: bool,
     rsv2: bool,
     rsv3: bool,
-    opcode: u8,
+    opcode_bits: u8,
+    opcode: WebSocketOpCode,
     mask_bit: bool,
     payload_len: u8,
     masking_key: [u8; 4],
     masked_payload: &'a [u8],
     unmasked_payload: Vec<u8>,
     payload: Vec<char>,
+}
+
+#[derive(Debug)]
+#[derive(PartialEq)]
+pub enum WebSocketOpCode {
+    Continuation,
+    Text,
+    Binary,
+    CloseConnection,
+    Ping,
+    Pong,
+    Unrecognized,
+    ReservedFuture,
 }
 
 impl<'a> WebSocketFrame<'a> {
@@ -63,6 +77,9 @@ impl<'a> WebSocketFrame<'a> {
 
         // Get frame length
         let frame_length: usize = data.len();
+
+        // Get the opcode bit values
+        let opcode_bits = get_bits_from_byte(data[0], 0b00001111);
 
         // Check if the payload is masked
         let is_payload_masked: bool = get_bit(data[1], 0);
@@ -106,7 +123,9 @@ impl<'a> WebSocketFrame<'a> {
             // Bit 3 contains rsv3
             rsv3: get_bit(data[0], 3),
             // Bits 4 - 7 contain the opcode
-            opcode: get_bits_from_byte(data[0], 0b00001111),
+            opcode_bits,
+            // Look up the opcode from the bits
+            opcode: get_opcode(opcode_bits),
             // Bit 8 contains mask flag
             mask_bit: is_payload_masked,
             // Bits 9 - 15 contain payload length
@@ -260,7 +279,7 @@ impl<'a> WebSocketFrame<'a> {
                 bit_color(bit_str(self.rsv1)),
                 bit_color(bit_str(self.rsv2)),
                 bit_color(bit_str(self.rsv3)),
-                bit_color(&byte_str(self.opcode, 4)),
+                bit_color(&byte_str(self.opcode_bits, 4)),
                 bit_color(bit_str(self.mask_bit)),
                 bit_color(&byte_str(self.payload_len, 7)),
                 bit_color(&byte_str(self.masking_key[0], 8)),
@@ -614,6 +633,20 @@ fn get_bits_from_byte(byte: u8, mask: u8) -> u8 {
     byte & mask
 }
 
+/// Gets an opcode from a 4-bit value
+fn get_opcode(opcode_bits: u8) -> WebSocketOpCode {
+    match opcode_bits {
+        0 => WebSocketOpCode::Continuation,
+        1 => WebSocketOpCode::Text,
+        2 => WebSocketOpCode::Binary,
+        8 => WebSocketOpCode::CloseConnection,
+        9 => WebSocketOpCode::Ping,
+        10 => WebSocketOpCode::Pong,
+        3 | 4 | 5 | 6 | 7 | 11 | 12 | 13 | 14 | 15 => WebSocketOpCode::ReservedFuture,
+        _ => WebSocketOpCode::Unrecognized,
+    }
+}
+
 /// Formats a byte or partial byte.
 ///
 /// # Arguments
@@ -665,10 +698,66 @@ mod tests {
         let frame = WebSocketFrame::from_bytes(&bytes);
         let expected = "               \u{1b}[36m+---------------+---------------+---------------+---------------+\u{1b}[0m\n  \u{1b}[37mFrame Data\u{1b}[0m   \u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  1    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  2    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  3    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  4    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n  \u{1b}[37m (Masked) \u{1b}[0m   \u{1b}[36m+---------------+---------------+---------------+---------------+\u{1b}[0m\n  \u{1b}[37m (Short)  \u{1b}[0m   \u{1b}[36m|\u{1b}[0m\u{1b}[32m0\u{1b}[0m              \u{1b}[36m|\u{1b}[0m    \u{1b}[32m1\u{1b}[0m          \u{1b}[36m|\u{1b}[0m        \u{1b}[32m2\u{1b}[0m      \u{1b}[36m|\u{1b}[0m            \u{1b}[32m3\u{1b}[0m  \u{1b}[36m|\u{1b}[0m\n               \u{1b}[36m|\u{1b}[0m\u{1b}[32m0 1 2 3 4 5 6 7\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m8 9 0 1 2 3 4 5\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m6 7 8 9 0 1 2 3\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m4 5 6 7 8 9 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+---------------+---------------+---------------+---------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 0 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 1 0 1 1 0 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 0 1 1 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   1   \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mF\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mM\u{1b}[0m\u{1b}[36m|\u{1b}[0m             \u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mI\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mop code\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mA\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m Payload len \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m     Masking-key (part 1)      \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mN\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m (4 b) \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m  (7 bits)   \u{1b}[0m\u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m \u{1b}[36m|\u{1b}[0m\u{1b}[35m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m2\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m3\u{1b}[0m\u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mK\u{1b}[0m\u{1b}[36m|\u{1b}[0m             \u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+-+-+-+-+-------+-+-------------+-------------------------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1 0 0 1 0 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 1 1 0 1 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 1 1 1 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 1 1 0 1 1 0 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   2   \u{1b}[0m\u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m \u{1b}[34m (59)\u{1b}[0m      \u{1b}[35mMASKED\u{1b}[0m  \u{1b}[34m(108)\u{1b}[0m      \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m     Masking-key (part 2)      \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 0 0 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 0 0 0 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m           (16 bits)           \u{1b}[0m\u{1b}[36m|\u{1b}[0m \u{1b}[34m (97)\u{1b}[0m \u{1b}[31m\'a\'\u{1b}[0m \u{1b}[35mUNMASKED\u{1b}[0m \u{1b}[34m (98)\u{1b}[0m \u{1b}[31m\'b\'\u{1b}[0m  \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\u{1b}[35m     Payload Data (part 1)     \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+-------------------------------+-------------------------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1 1 1 1 0 0 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   3   \u{1b}[0m\u{1b}[36m|\u{1b}[0m \u{1b}[34m(242)\u{1b}[0m     \u{1b}[35mMSK\u{1b}[0m \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 0 0 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m \u{1b}[34m (99)\u{1b}[0m \u{1b}[31m\'c\'\u{1b}[0m \u{1b}[35mUNM\u{1b}[0m \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m Payload pt 2  \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+\u{1b}[0m\u{1b}[36m---------------+\u{1b}[0m\n";
         
-        // println!("1-------10--------20--------30--------40--------50--------60--------70--------80");
-        // println!("{}", frame.format());
+        println!("1-------10--------20--------30--------40--------50--------60--------70--------80");
+        println!("{}", frame.format());
 
         assert_eq!(frame.format(), expected);
+    }
+
+    #[test]
+    fn test_get_opcode_continuation() {
+        // Continuation
+        assert_eq!(WebSocketOpCode::Continuation, get_opcode(0b00000000));
+    }
+
+    #[test]
+    fn text_get_opcode_text() {
+        // Text
+        assert_eq!(WebSocketOpCode::Text, get_opcode(0b00000001));
+    }
+
+    #[test]
+    fn text_get_opcode_binary() {
+        // Binary
+        assert_eq!(WebSocketOpCode::Binary, get_opcode(0b00000010));
+    }
+
+    #[test]
+    fn text_get_opcode_close_connection() {
+        // Close Connection
+        assert_eq!(WebSocketOpCode::CloseConnection, get_opcode(0b00001000));
+    }
+
+    #[test]
+    fn text_get_opcode_ping() {
+        // Ping
+        assert_eq!(WebSocketOpCode::Ping, get_opcode(0b00001001));
+    }
+
+    #[test]
+    fn text_get_opcode_pong() {
+        // Pong
+        assert_eq!(WebSocketOpCode::Pong, get_opcode(0b00001010));
+    }
+
+    #[test]
+    fn text_get_opcode_reserved_future() {
+        // Pong
+        assert_eq!(WebSocketOpCode::ReservedFuture, get_opcode(0b00000011));
+        assert_eq!(WebSocketOpCode::ReservedFuture, get_opcode(0b00000100));
+        assert_eq!(WebSocketOpCode::ReservedFuture, get_opcode(0b00000101));
+        assert_eq!(WebSocketOpCode::ReservedFuture, get_opcode(0b00000110));
+        assert_eq!(WebSocketOpCode::ReservedFuture, get_opcode(0b00000111));
+        assert_eq!(WebSocketOpCode::ReservedFuture, get_opcode(0b00001011));
+        assert_eq!(WebSocketOpCode::ReservedFuture, get_opcode(0b00001100));
+        assert_eq!(WebSocketOpCode::ReservedFuture, get_opcode(0b00001101));
+        assert_eq!(WebSocketOpCode::ReservedFuture, get_opcode(0b00001111));
+    }
+
+    #[test]
+    fn text_get_opcode_unrecognized() {
+        // Pong
+        assert_eq!(WebSocketOpCode::Unrecognized, get_opcode(0b01000000));
     }
 }
 
