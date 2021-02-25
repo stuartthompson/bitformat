@@ -14,11 +14,14 @@ I created this crate to solve a specific problem. It is in a very early stage.
 * v0.0.2 - Includes examples in README, adds changelog and roadmap
 * v0.0.3 - README formatting updates
 * v0.0.4 - Custom style colors for websocket data frame
+* v0.0.5 - Opcode and payload length inline
 
 ## Roadmap
 
-* v0.0.5 - Support for styles in qword table (custom colors)
-* v0.0.6 - Support for custom border glyphs
+* v0.0.6 - WebSocker data frame medium (16bit) and long (64bit) packet lengths
+* v0.0.7 - WebSocket data frame summary
+* v0.0.8 - Support for styles in qword table (custom colors)
+* v0.0.9 - Support for custom border glyphs
 * v0.1.0 - Support for WORD and DWORD tables _(in addition to QWORD)_
 
 ## Specific Formats
