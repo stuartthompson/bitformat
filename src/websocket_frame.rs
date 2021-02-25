@@ -79,7 +79,6 @@ pub struct WebSocketFrame<'a> {
     masked_payload: &'a [u8],
     unmasked_payload: Vec<u8>,
     payload_chars: Vec<char>,
-    payload_text: String
 }
 
 impl<'a> WebSocketFrame<'a> {
@@ -129,9 +128,6 @@ impl<'a> WebSocketFrame<'a> {
             payload_chars.push(byte as char);
         }
 
-        // Get payload contents as text
-        let payload_text = std::str::from_utf8(&unmasked_payload).unwrap().to_string();
-
         WebSocketFrame {
             // Bytes in frame
             frame_len: data.len() as u8,
@@ -165,8 +161,6 @@ impl<'a> WebSocketFrame<'a> {
             unmasked_payload,
             // Vector of chars in payload
             payload_chars,
-            // Payload contents as text
-            payload_text
         }
     }
 
@@ -177,9 +171,6 @@ impl<'a> WebSocketFrame<'a> {
     /// * `self` - The `WebSocketFrame` being formatted.
     pub fn format(self: &WebSocketFrame<'a>) -> String {
         let mut result = self.format_header();
-
-        let summary_title_color = |s: &str| s.color(self.format_style.summary_title_color.to_string());
-        let summary_value_color = |s: &str| s.color(self.format_style.summary_value_color.to_string());
 
         result.push_str(&self.format_first_two_dwords());
 
@@ -221,41 +212,6 @@ impl<'a> WebSocketFrame<'a> {
                 (remaining_payload_dwords * 2) + 2,
             ));
         }
-
-        // Format summary
-        result.push_str("\n");
-        // Summary: fin bit
-        result.push_str(
-            &format!(
-                "{0:>16} {1}\n", 
-                summary_title_color("Final frag?:"),
-                summary_value_color(if self.fin_bit { "YES"} else { "NO" }),
-            )
-        );
-        // Summary: op code
-        result.push_str(
-            &format!(
-                "{0:>16} {1}\n",
-                summary_title_color("Op code:"),
-                summary_value_color(&format!("{:?}", self.opcode)),
-            )
-        );
-        // Summary: Payload length
-        result.push_str(
-            &format!(
-                "{0:>16} {1}\n",
-                summary_title_color("Payload len:"),
-                summary_value_color(&format!("{:?}", self.payload_length)),
-            )
-        );
-        // Summary: Payload
-        result.push_str(
-            &format!(
-                "{0:>16} {1}\n",
-                summary_title_color("Payload:"),
-                summary_value_color(&format!("{:?}", self.payload_text)),
-            )
-        );
 
         result
     }
@@ -375,7 +331,7 @@ impl<'a> WebSocketFrame<'a> {
         // Line 2: Op code and first line of bit names
         result.push_str(
             &format!(
-                "{0:7}{1}{2:^7}{1}{3}{1}{4}{1}{4}{1}{4}{1}{6:^7}{1}{5}{1}{0:13}{1}{0:31}{1}\n",
+                "{0:7}{1}{2:^7}{1}{3}{1}{4}{1}{4}{1}{4}{1}{6:^7}{1}{5}{1}{7:^13}{1}{0:31}{1}\n",
                 "",
                 border_color("|"),
                 dword_title_color("1"),
@@ -383,6 +339,7 @@ impl<'a> WebSocketFrame<'a> {
                 notes_color("R"),
                 notes_color("M"),
                 data_value_color(&format!("{:?}",self.opcode)),
+                data_value_color(&format!("{:?}", self.payload_length)),
             )
         );
         // Append the second line of bit identifiers
@@ -791,15 +748,14 @@ mod tests {
 
     #[test]
     fn test_short_masked_text_frame() {
-        let bytes = base64::decode("gYNaDpE2O2zy").unwrap();
+        let bytes = base64::decode("gYR7q0rdD845qQ==").unwrap();
 
         let frame = WebSocketFrame::from_bytes(&bytes);
-        let expected = "               \u{1b}[36m+---------------+---------------+---------------+---------------+\u{1b}[0m\n  \u{1b}[37mFrame Data\u{1b}[0m   \u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  1    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  2    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  3    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  4    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n  \u{1b}[37m (Masked) \u{1b}[0m   \u{1b}[36m+---------------+---------------+---------------+---------------+\u{1b}[0m\n  \u{1b}[37m (Short)  \u{1b}[0m   \u{1b}[36m|\u{1b}[0m\u{1b}[32m0\u{1b}[0m              \u{1b}[36m|\u{1b}[0m    \u{1b}[32m1\u{1b}[0m          \u{1b}[36m|\u{1b}[0m        \u{1b}[32m2\u{1b}[0m      \u{1b}[36m|\u{1b}[0m            \u{1b}[32m3\u{1b}[0m  \u{1b}[36m|\u{1b}[0m\n               \u{1b}[36m|\u{1b}[0m\u{1b}[32m0 1 2 3 4 5 6 7\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m8 9 0 1 2 3 4 5\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m6 7 8 9 0 1 2 3\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m4 5 6 7 8 9 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+---------------+---------------+---------------+---------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 0 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 1 0 1 1 0 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 0 1 1 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   1   \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mF\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[31m Text  \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mM\u{1b}[0m\u{1b}[36m|\u{1b}[0m             \u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mI\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mop code\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mA\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m Payload len \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m     Masking-key (part 1)      \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mN\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m (4 b) \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m  (7 bits)   \u{1b}[0m\u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m \u{1b}[36m|\u{1b}[0m\u{1b}[35m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m2\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m3\u{1b}[0m\u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mK\u{1b}[0m\u{1b}[36m|\u{1b}[0m             \u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+-+-+-+-+-------+-+-------------+-------------------------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1 0 0 1 0 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 1 1 0 1 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 1 1 1 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 1 1 0 1 1 0 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   2   \u{1b}[0m\u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m \u{1b}[34m (59)\u{1b}[0m      \u{1b}[35mMASKED\u{1b}[0m  \u{1b}[34m(108)\u{1b}[0m      \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m     Masking-key (part 2)      \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 0 0 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 0 0 0 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m           (16 bits)           \u{1b}[0m\u{1b}[36m|\u{1b}[0m \u{1b}[34m (97)\u{1b}[0m \u{1b}[31m\'a\'\u{1b}[0m \u{1b}[35mUNMASKED\u{1b}[0m \u{1b}[34m (98)\u{1b}[0m \u{1b}[31m\'b\'\u{1b}[0m  \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\u{1b}[35m     Payload Data (part 1)     \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+-------------------------------+-------------------------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1 1 1 1 0 0 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   3   \u{1b}[0m\u{1b}[36m|\u{1b}[0m \u{1b}[34m(242)\u{1b}[0m     \u{1b}[35mMSK\u{1b}[0m \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 0 0 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m \u{1b}[34m (99)\u{1b}[0m \u{1b}[31m\'c\'\u{1b}[0m \u{1b}[35mUNM\u{1b}[0m \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m Payload pt 2  \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+\u{1b}[0m\u{1b}[36m---------------+\u{1b}[0m\n";
+        let expected = "               \u{1b}[36m+---------------+---------------+---------------+---------------+\u{1b}[0m\n  \u{1b}[37mFrame Data\u{1b}[0m   \u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  1    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  2    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  3    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m    Byte  4    \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n  \u{1b}[37m (Masked) \u{1b}[0m   \u{1b}[36m+---------------+---------------+---------------+---------------+\u{1b}[0m\n   Short(4)    \u{1b}[36m|\u{1b}[0m\u{1b}[32m0\u{1b}[0m              \u{1b}[36m|\u{1b}[0m    \u{1b}[32m1\u{1b}[0m          \u{1b}[36m|\u{1b}[0m        \u{1b}[32m2\u{1b}[0m      \u{1b}[36m|\u{1b}[0m            \u{1b}[32m3\u{1b}[0m  \u{1b}[36m|\u{1b}[0m\n               \u{1b}[36m|\u{1b}[0m\u{1b}[32m0 1 2 3 4 5 6 7\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m8 9 0 1 2 3 4 5\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m6 7 8 9 0 1 2 3\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[32m4 5 6 7 8 9 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+---------------+---------------+---------------+---------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 0 1 0 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 1 1 1 1 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1 0 1 0 1 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   1   \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mF\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mR\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[31m Text  \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mM\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[31m  Short(4)   \u{1b}[0m\u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mI\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mop code\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mA\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m Payload len \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m     Masking-key (part 1)      \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mN\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mV\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m (4 b) \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35mS\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m  (7 bits)   \u{1b}[0m\u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m \u{1b}[36m|\u{1b}[0m\u{1b}[35m1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m2\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[35m3\u{1b}[0m\u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35mK\u{1b}[0m\u{1b}[36m|\u{1b}[0m             \u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+-+-+-+-+-------+-+-------------+-------------------------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 1 0 0 1 0 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1 1 0 1 1 1 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 0 0 1 1 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1 1 0 0 1 1 1 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   2   \u{1b}[0m\u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m \u{1b}[34m (15)\u{1b}[0m      \u{1b}[35mMASKED\u{1b}[0m  \u{1b}[34m(206)\u{1b}[0m      \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m     Masking-key (part 2)      \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 1 0 1 0 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 0 0 1 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m           (16 bits)           \u{1b}[0m\u{1b}[36m|\u{1b}[0m \u{1b}[34m(116)\u{1b}[0m \u{1b}[31m\'t\'\u{1b}[0m \u{1b}[35mUNMASKED\u{1b}[0m \u{1b}[34m(101)\u{1b}[0m \u{1b}[31m\'e\'\u{1b}[0m  \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m                               \u{1b}[36m|\u{1b}[0m\u{1b}[35m     Payload Data (part 1)     \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+-------------------------------+-------------------------------+\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m DWORD \u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m0 0 1 1 1 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[37m1 0 1 0 1 0 0 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m\u{1b}[32m   3   \u{1b}[0m\u{1b}[36m|\u{1b}[0m \u{1b}[34m (57)\u{1b}[0m      \u{1b}[35mMASKED\u{1b}[0m  \u{1b}[34m(169)\u{1b}[0m      \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 1 0 0 1 1\u{1b}[0m\u{1b}[36m|\u{1b}[0m\u{1b}[33m0 1 1 1 0 1 0 0\u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m \u{1b}[34m(115)\u{1b}[0m \u{1b}[31m\'s\'\u{1b}[0m \u{1b}[35mUNMASKED\u{1b}[0m \u{1b}[34m(116)\u{1b}[0m \u{1b}[31m\'t\'\u{1b}[0m  \u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m|\u{1b}[0m       \u{1b}[36m|\u{1b}[0m\u{1b}[35m     Payload Data (part 2)     \u{1b}[0m\u{1b}[36m|\u{1b}[0m\n       \u{1b}[36m+-------+\u{1b}[0m\u{1b}[36m---------------+\u{1b}[0m\u{1b}[36m---------------+\u{1b}[0m\n";
         
-        println!("1-------10--------20--------30--------40--------50--------60--------70--------80");
-        println!("{}", frame.format());
+        //println!("{}", frame.format());
 
-        //assert_eq!(frame.format(), expected);
+        assert_eq!(frame.format(), expected);
     }
 }
 
