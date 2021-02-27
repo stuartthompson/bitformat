@@ -18,7 +18,7 @@ I created this crate to solve a specific problem. It is in a very early stage.
 
 ## Roadmap
 
-* v0.0.6 - WebSocker data frame medium (16bit) and long (64bit) packet lengths
+* v0.0.6 - WebSocket data frame medium (16bit) and long (64bit) packet lengths
 * v0.0.7 - WebSocket data frame summary
 * v0.0.8 - Support for styles in qword table (custom colors)
 * v0.0.9 - Support for custom border glyphs
