@@ -1,12 +1,12 @@
 const BITS_IN_BYTE: u8 = 8;
 
-pub struct QwordTable<'a> {
+pub struct ByteList<'a> {
     data: &'a Vec<u8>,
 }
 
-impl<'a> QwordTable<'a> {
-    pub fn from_bytes(data: &Vec<u8>) -> QwordTable {
-        QwordTable { data }
+impl<'a> ByteList<'a> {
+    pub fn from_bytes(data: &Vec<u8>) -> ByteList {
+        ByteList { data }
     }
 
     /// Formats a vector of bytes as a qword table.
@@ -14,7 +14,7 @@ impl<'a> QwordTable<'a> {
     /// # Arguments
     ///
     /// * `data` - The bytes to format.
-    pub fn format(self: &QwordTable<'a>) -> String {
+    pub fn format(self: &ByteList<'a>) -> String {
         let mut result = self.format_qword_table_header();
         let num_qwords = self.data.len().div_euclid(BITS_IN_BYTE as usize);
         // Append full qwords
@@ -42,7 +42,7 @@ impl<'a> QwordTable<'a> {
     }
 
     /// Formats the header for a qword table.
-    fn format_qword_table_header(self: &QwordTable<'a>) -> String {
+    fn format_qword_table_header(self: &ByteList<'a>) -> String {
         // Top border
         let mut result = String::from("       +");
         result.push_str(&(0..BITS_IN_BYTE).map(|_| "--------+").collect::<String>());
@@ -69,7 +69,7 @@ impl<'a> QwordTable<'a> {
     /// * `data` - The bytes within the qword to format.
     /// * `num_bytes` - The number of bytes to format.
     fn format_qword_row(
-        self: &QwordTable<'a>,
+        self: &ByteList<'a>,
         qword_number: usize,
         data: &[u8],
         num_bytes: usize,
@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn test_one_byte() {
         let data = vec![129];
-        let table: QwordTable = QwordTable::from_bytes(&data);
+        let table: ByteList = ByteList::from_bytes(&data);
 
         let expected = "       +--------+--------+--------+--------+--------+--------+--------+--------+\n Bytes | Byte 0 | Byte 1 | Byte 2 | Byte 3 | Byte 4 | Byte 5 | Byte 6 | Byte 7 |\n+------+--------+--------+--------+--------+--------+--------+--------+--------+\n|QWORD |10000001|\n|  1   |   (129)|\n+------+--------+\n";
 
